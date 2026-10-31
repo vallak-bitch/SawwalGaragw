@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAWWAL - Toko Online Fashion & Busana Muslim Premium</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React 18 & React DOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Supabase browser SDK (gunakan publishable/anon key saja di frontend) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Babel Standalone for Inline JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    .scrollbar-none::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-none {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased selection:bg-amber-500 selection:text-white">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // KONFIGURASI SUPABASE FRONTEND: isi URL dan publishable/anon key.
+    // Jangan pernah menaruh service_role/secret key atau Resend API key di sini.
+    const SUPABASE_URL = "https://ljpqdhkeakghgoyibrma.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_o3YxlLjM2aXUCvOPe2ebUA_74B-wiTY";
+    const supabaseClient = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
+
+    // --- HELPER COMPONENT UNTUK IKON LUCIDE ---
+    const Icon = ({ name, className = "w-4 h-4", ...props }) => {
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      });
+      return <i data-lucide={name} className={className} {...props}></i>;
+    };
+
+    // --- DATA AWAL SIMULASI ---
+    const INITIAL_PRODUCTS = [
+      {
+        id: 'prod-1',
+        name: 'Gamis Modern Premium Edition SAWWAL',
+        price: 350000,
+        discountPrice: 289000,
+        stock: 25,
+        category: 'Busana Muslim',
+        description: 'Gamis dengan bahan katun toyobo super halus, adem, tidak menerawang, dan sangat nyaman dipakai untuk acara formal maupun harian.',
+        additionalInfo: 'Garansi retur 7 hari jika terdapat cacat pabrik atau salah ukuran. Instruksi pencucian: cuci lembut tanpa pemutih.',
+        variations: 'Warna: Hitam, Navy, Olive | Ukuran: M, L, XL',
+        image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&q=80&w=600',
+        salesCount: 142,
+        rating: 4.9
+      },
+      {
+        id: 'prod-2',
+        name: 'Kemeja Koko Modern Slimfit SAWWAL',
+        price: 220000,
+        discountPrice: 175000,
+        stock: 40,
+        category: 'Busana Muslim',
+        description: 'Kemeja koko berbahan kain katun linen premium dengan jahitan presisi, memberikan kesan gagah dan elegan saat beribadah.',
+        additionalInfo: 'Bahan adem, tidak mudah kusut. Disarankan disetrika dengan suhu sedang.',
+        variations: 'Warna: Putih, Abu, Mocca | Ukuran: L, XL, XXL',
+        image: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&q=80&w=600',
+        salesCount: 98,
+        rating: 4.8
+      },
+      {
+        id: 'prod-3',
+        name: 'Hijab Pashmina Silk Luxury Edition',
+        price: 95000,
+        discountPrice: 65000,
+        stock: 60,
+        category: 'Hijab & Aksesoris',
+        description: 'Pashmina bermaterialkan silk berkualitas tinggi yang lembut, mengkilap mewah, mudah dibentuk, dan tegak di dahi.',
+        additionalInfo: '100% Original SAWWAL Hijab Collection.',
+        variations: 'Warna: Rose Gold, Mocca, Emerald, Jet Black',
+        image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=600',
+        salesCount: 230,
+        rating: 5.0
+      }
+    ];
+
+    const INITIAL_CATEGORIES = ['Semua', 'Busana Muslim', 'Hijab & Aksesoris', 'Pakaian Pria', 'Pakaian Wanita'];
+
+    const INITIAL_BANNERS = [
+      {
+        id: 'b-1',
+        title: 'PROMO SPESIAL HARI INI',
+        subtitle: 'Diskon Hingga 50% Untuk Koleksi Eksklusif SAWWAL',
+        image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=1200'
+      }
+    ];
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      const [products, setProducts] = useState(INITIAL_PRODUCTS);
+      const [categories, setCategories] = useState(INITIAL_CATEGORIES);
+      const [banners, setBanners] = useState(INITIAL_BANNERS);
+      const [cart, setCart] = useState([]);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedCategory, setSelectedCategory] = useState('Semua');
+      const [selectedProduct, setSelectedProduct] = useState(null);
+      const [infoModalTab, setInfoModalTab] = useState(null);
+      
+      const [activeView, setActiveView] = useState('home'); 
+      const [ownerLoggedIn, setOwnerLoggedIn] = useState(false);
+      const [userLoggedIn, setUserLoggedIn] = useState(null); 
+      const [toastMessage, setToastMessage] = useState('');
+
+      const [userAuthTab, setUserAuthTab] = useState('login'); 
+      const [userLoginForm, setUserLoginForm] = useState({ email: '', password: '' });
+      const [userRegisterForm, setUserRegisterForm] = useState({ name: '', email: '', phone: '', password: '' });
+
+      const [customers, setCustomers] = useState([
+        { id: 'c-1', name: 'Budi Santoso', email: 'budi@gmail.com', phone: '08123456789', status: 'Approved', registeredAt: new Date().toISOString() },
+        { id: 'c-2', name: 'Siti Rahma', email: 'siti@gmail.com', phone: '08571234567', status: 'Pending', registeredAt: new Date().toISOString() }
+      ]);
+
+      const [orders, setOrders] = useState([]);
+      const [emailNotifications, setEmailNotifications] = useState([]);
+
+      const [storeSettings, setStoreSettings] = useState({
+        name: 'SAWWAL Store',
+        tagline: 'Fashion & Busana Muslim Premium',
+        logoTextSize: 'text-sm sm:text-base',
+        heroTitle: 'PROMO SPESIAL SAWWAL',
+        heroSubtitle: 'Temukan koleksi busana muslim modern dan berkualitas tinggi dengan harga spesial hari ini.',
+        footerDescription: 'Penyedia busana Muslim & E-Commerce fashion terkemuka dengan kualitas bahan premium dan desain eksklusif modern.',
+        announcementText: '✨ Gratis Ongkir ke Seluruh Indonesia | Garansi Retur 7 Hari 100% Original',
+        showAnnouncement: true,
+        themeColor: 'amber',
+        waNumber: '6288235985430',
+        ownerEmail: 'satanteam034@gmail.com',
+        bankInfo: 'BCA 1234567890 a.n SAWWAL Official',
+        address: 'Jl. Pemuda No. 88, Jakarta Selatan',
+        contentCaraBeli: '1. Pilih busana atau item favoritmu dari katalog produk.\n2. Klik tombol + Keranjang.\n3. Buka Keranjang Belanja, lalu klik Lanjut Ke Checkout.\n4. Isi data nama, nomor WhatsApp, serta alamat pengiriman.\n5. Klik Buat Pesanan & Pesan via WhatsApp.',
+        contentGaransiRetur: '• Garansi retur 7 hari sejak barang diterima.\n• Pengembalian berlaku jika cacat pabrik atau salah ukuran.\n• Wajib menyertakan video unboxing paket.',
+        contentSyaratKetentuan: '• Semua produk terjamin 100% original.\n• Pengiriman Senin - Sabtu.\n• Pesanan sebelum jam 15.00 WIB dikirim hari yang sama.',
+        contentKontakCs: 'WhatsApp CS: +6288235985430\nEmail: satanxsawal@gmail.com\nJam Operasional: 08.00 - 21.00 WIB',
+        contentKebijakanPrivasi: 'Kami menjaga kerahasiaan data pribadi Anda dengan standar enkripsi keamanan tertinggi. Data transaksi hanya digunakan untuk keperluan pengiriman pesanan dan tidak akan dibagikan ke pihak ketiga.\n\nTiktok @satanteam666_\nDeveloper satanteam034@gmail.com'
+      });
+
+      const [adminTab, setAdminTab] = useState('dashboard');
+
+      const showToast = (msg) => {
+        setToastMessage(msg);
+        setTimeout(() => setToastMessage(''), 3000);
+      };
+
+      const mapDbProduct = (p) => ({
+        id: p.id, name: p.name, price: Number(p.price || 0),
+        discountPrice: p.discount_price == null ? null : Number(p.discount_price),
+        stock: Number(p.stock || 0), category: p.category || 'Umum',
+        description: p.description || '', additionalInfo: p.additional_info || '',
+        variations: p.variations || '', image: p.image_url || '',
+        salesCount: Number(p.sales_count || 0), rating: Number(p.rating || 5)
+      });
+
+      const loadCloudProducts = async () => {
+        const { data, error } = await supabaseClient.from('products')
+          .select('*').eq('is_active', true).order('created_at', { ascending: false });
+        if (error) { console.error('Load products:', error); return; }
+        if (data && data.length) setProducts(data.map(mapDbProduct));
+      };
+
+      const loadOwnerOrders = async () => {
+        const { data, error } = await supabaseClient.from('orders')
+          .select('*').order('created_at', { ascending: false });
+        if (error) { console.error('Load orders:', error); return; }
+        setOrders((data || []).map(o => ({
+          id: o.id, customerName: o.customer_name, customerPhone: o.customer_phone,
+          address: o.address, notes: o.notes, paymentMethod: o.payment_method,
+          items: o.items || [], total: Number(o.total || 0), status: o.status,
+          createdAt: o.created_at
+        })));
+      };
+
+      const persistProducts = async (updater) => {
+        const next = typeof updater === 'function' ? updater(products) : updater;
+        setProducts(next);
+        const isUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v));
+        const rows = next.map(p => ({
+          ...(isUuid(p.id) ? { id: p.id } : {}),
+          name: p.name, price: Number(p.price || 0),
+          discount_price: p.discountPrice == null ? null : Number(p.discountPrice),
+          stock: Number(p.stock || 0), category: p.category || 'Umum',
+          description: p.description || '', additional_info: p.additionalInfo || '',
+          variations: p.variations || '', image_url: p.image || '',
+          sales_count: Number(p.salesCount || 0), rating: Number(p.rating || 5),
+          is_active: true
+        }));
+        const { data: existing, error: readError } = await supabaseClient.from('products').select('id');
+        if (readError) { alert('Tidak dapat menyinkronkan produk: ' + readError.message); return; }
+        const keepIds = rows.filter(r => r.id).map(r => r.id);
+        const removed = (existing || []).map(r => r.id).filter(id => !keepIds.includes(id));
+        if (removed.length) {
+          const { error } = await supabaseClient.from('products').delete().in('id', removed);
+          if (error) { alert('Gagal menghapus produk: ' + error.message); return; }
+        }
+        const { error } = await supabaseClient.from('products').upsert(rows);
+        if (error) { alert('Gagal menyimpan produk: ' + error.message); return; }
+        await loadCloudProducts();
+      };
+
+      useEffect(() => {
+        loadCloudProducts();
+        supabaseClient.auth.getSession().then(async ({ data }) => {
+          if (!data?.session) return;
+          const { data: isOwner, error } = await supabaseClient.rpc('is_owner');
+          if (!error && isOwner) {
+            setOwnerLoggedIn(true);
+            await loadOwnerOrders();
+          } else {
+            await supabaseClient.auth.signOut();
+          }
+        });
+      }, []);
+
+      // Email asli dikirim oleh Supabase Database Webhook + Edge Function.
+      // Browser tidak pernah memegang API key email.
+
+      const handleAddToCart = (product, variation = '') => {
+        setCart(prev => {
+          const existing = prev.find(item => item.id === product.id && item.variation === variation);
+          if (existing) {
+            return prev.map(item => item.id === product.id && item.variation === variation 
+              ? { ...item, qty: item.qty + 1 } : item
+            );
+          }
+          return [...prev, { ...product, variation, qty: 1 }];
+        });
+        showToast(`"${product.name}" ditambahkan!`);
+      };
+
+      const handleUpdateQty = (id, variation, delta) => {
+        setCart(prev => prev.map(item => {
+          if (item.id === id && item.variation === variation) {
+            const newQty = item.qty + delta;
+            return newQty > 0 ? { ...item, qty: newQty } : null;
+          }
+          return item;
+        }).filter(Boolean));
+      };
+
+      const handleCheckoutSubmit = async (e, checkoutForm) => {
+        e.preventDefault();
+        if (cart.length === 0) return;
+
+        if (SUPABASE_URL.includes("YOUR_PROJECT_REF") ||
+            SUPABASE_ANON_KEY.includes("YOUR_SUPABASE_")) {
+          alert("Hubungkan Supabase terlebih dahulu. Isi SUPABASE_URL dan SUPABASE_ANON_KEY di file HTML.");
+          return;
+        }
+
+        const address = `${checkoutForm.address}, ${checkoutForm.city}, ${checkoutForm.postalCode}`;
+        const safeItems = cart.map(item => ({
+          product_id: String(item.id),
+          name: String(item.name),
+          variation: String(item.variation || ''),
+          quantity: Number(item.qty),
+          unit_price: Number(item.discountPrice || item.price)
+        }));
+
+        // Harga dan stok dihitung ulang oleh database, bukan dipercaya dari browser.
+        const { data: createdOrder, error: orderError } = await supabaseClient.rpc('create_order', {
+          p_customer_name: checkoutForm.name,
+          p_customer_phone: checkoutForm.phone,
+          p_address: address,
+          p_notes: checkoutForm.notes || '',
+          p_payment_method: checkoutForm.paymentMethod,
+          p_items: cart.map(item => ({
+            product_id: item.id,
+            quantity: Number(item.qty),
+            variation: String(item.variation || '')
+          }))
+        });
+
+        if (orderError) {
+          console.error('Supabase order error:', orderError);
+          alert('Pesanan belum tersimpan: ' + orderError.message);
+          return;
+        }
+        const orderId = createdOrder.id;
+        const totalAmount = Number(createdOrder.total);
+        const newOrder = {
+          id: orderId,
+          customerName: checkoutForm.name,
+          customerPhone: checkoutForm.phone,
+          address,
+          notes: checkoutForm.notes,
+          paymentMethod: checkoutForm.paymentMethod,
+          items: cart,
+          total: totalAmount,
+          status: 'Pesanan Baru',
+          createdAt: new Date().toISOString()
+        };
+
+        setOrders(prev => [newOrder, ...prev]);
+
+        let waText = `*PESANAN BARU - ${storeSettings.name}*\n`;
+        waText += `*ID:* ${orderId}\n`;
+        waText += `*Nama:* ${checkoutForm.name}\n`;
+        waText += `*No. WA:* ${checkoutForm.phone}\n`;
+        waText += `*Alamat:* ${address}\n\n`;
+        cart.forEach((item, idx) => {
+          waText += `${idx + 1}. ${item.name} (${item.variation || 'Standar'}) x${item.qty}\n`;
+        });
+        waText += `\n*Total:* Rp ${totalAmount.toLocaleString('id-ID')}`;
+
+        const waUrl = `https://wa.me/${storeSettings.waNumber}?text=${encodeURIComponent(waText)}`;
+        setCart([]);
+        setActiveView('home');
+        showToast('Pesanan tersimpan! Notifikasi email sedang diproses.');
+        window.location.href = waUrl;
+      };
+
+      const filteredProducts = products.filter(p => {
+        const matchCat = selectedCategory === 'Semua' || p.category === selectedCategory;
+        const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchCat && matchSearch;
+      });
+
+      return (
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col antialiased">
+          {toastMessage && (
+            <div className="fixed top-2 right-2 z-50 bg-slate-900 text-white text-[9px] px-2.5 py-1 rounded-md shadow-md flex items-center gap-1 border border-slate-700 animate-bounce">
+              <Icon name="check-circle-2" className="w-3 h-3 text-amber-400" />
+              <span>{toastMessage}</span>
+            </div>
+          )}
+
+          {storeSettings.showAnnouncement && storeSettings.announcementText && (
+            <div className="bg-slate-900 text-amber-400 text-[8px] sm:text-[10px] py-1 px-2 text-center font-semibold tracking-wide">
+              {storeSettings.announcementText}
+            </div>
+          )}
+
+          <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-2xs">
+            <div className="max-w-7xl mx-auto px-2.5 sm:px-4 py-1.5 flex items-center justify-between gap-2">
+              
+              <div 
+                onClick={() => setActiveView('home')}
+                className="cursor-pointer flex items-center gap-1.5 group"
+              >
+                <div className="w-6 h-6 sm:w-7 sm:h-7 bg-gradient-to-tr from-amber-600 to-yellow-500 rounded-md flex items-center justify-center text-white font-black text-xs shadow-2xs group-hover:scale-105 transition-transform">
+                  S
+                </div>
+                <div>
+                  <span className={`${storeSettings.logoTextSize || 'text-xs sm:text-sm'} font-black tracking-tight text-slate-900 block leading-tight`}>
+                    {storeSettings.name}
+                  </span>
+                </div>
+              </div>
+
+              {activeView === 'home' && (
+                <div className="flex-1 max-w-sm mx-2 hidden sm:block">
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      placeholder="Cari produk..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-100 text-slate-800 pl-7 pr-3 py-1 rounded-md text-[10px] outline-none focus:ring-1 focus:ring-amber-500 transition"
+                    />
+                    <Icon name="search" className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1">
+                {userLoggedIn ? (
+                  <div className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md">
+                    <Icon name="user" className="w-2.5 h-2.5 text-amber-600 flex-shrink-0" />
+                    <div className="text-[9px] sm:text-[11px] leading-tight">
+                      <span className="font-bold text-slate-800 block line-clamp-1 max-w-[55px] sm:max-w-[85px] text-[9px] sm:text-[11px]">{userLoggedIn.name}</span>
+                      <span className={`text-[7px] sm:text-[8px] font-extrabold ${userLoggedIn.status === 'Approved' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {userLoggedIn.status === 'Approved' ? 'Aktif' : 'Pending'}
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => { setUserLoggedIn(null); showToast('Keluar'); }}
+                      className="ml-0.5 text-red-500 hover:text-red-700 font-bold p-0.5"
+                    >
+                      <Icon name="log-out" className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => setActiveView('login-user')}
+                    className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[9px] sm:text-[10px] font-bold transition flex items-center gap-1"
+                  >
+                    <Icon name="user" className="w-3 h-3 text-slate-600" />
+                    <span>Masuk</span>
+                  </button>
+                )}
+
+                <button 
+                  onClick={() => setActiveView('cart')}
+                  className="relative p-1.5 bg-amber-50 text-amber-700 rounded-md hover:bg-amber-100 transition"
+                >
+                  <Icon name="shopping-cart" className="w-3.5 h-3.5" />
+                  {cart.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-amber-600 text-white font-black text-[7px] w-3 h-3 rounded-full flex items-center justify-center">
+                      {cart.reduce((s, i) => s + i.qty, 0)}
+                    </span>
+                  )}
+                </button>
+
+                {ownerLoggedIn ? (
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => setActiveView('owner-dashboard')}
+                      className="bg-slate-900 text-amber-400 hover:bg-slate-800 px-2 py-1 rounded-md text-[9px] sm:text-[10px] font-bold transition flex items-center gap-1 shadow-2xs"
+                    >
+                      <Icon name="shield" className="w-2.5 h-2.5" />
+                      <span>Panel</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setOwnerLoggedIn(false);
+                        setActiveView('home');
+                        showToast('Owner berhasil keluar');
+                      }}
+                      className="bg-red-50 hover:bg-red-100 text-red-600 px-1.5 py-1 rounded-md text-[9px] sm:text-[10px] font-bold transition flex items-center gap-1"
+                      title="Keluar / Logout Owner"
+                    >
+                      <Icon name="log-out" className="w-2.5 h-2.5" />
+                      <span>Keluar</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => setActiveView('login-owner')}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 transition"
+                    title="Owner"
+                  >
+                    <Icon name="shield" className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {activeView === 'home' && (
+              <div className="px-2.5 pb-1.5 sm:hidden">
+                <div className="relative">
+                  <input 
+                    type="text"
+                    placeholder="Cari produk..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-100 text-slate-800 pl-7 pr-3 py-1 rounded-md text-[10px] outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                  <Icon name="search" className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
+                </div>
+              </div>
+            )}
+          </header>
+
+          <div className="flex-1">
+            {activeView === 'home' && (
+              <HomeView 
+                banners={banners}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                products={filteredProducts}
+                onSelectProduct={(p) => setSelectedProduct(p)}
+                onAddToCart={handleAddToCart}
+                storeSettings={storeSettings}
+              />
+            )}
+
+            {activeView === 'cart' && (
+              <CartView 
+                cart={cart}
+                onUpdateQty={handleUpdateQty}
+                onProceedToCheckout={() => setActiveView('checkout')}
+                onBackToShop={() => setActiveView('home')}
+              />
+            )}
+
+            {activeView === 'checkout' && (
+              <CheckoutView 
+                cart={cart}
+                userLoggedIn={userLoggedIn}
+                onSubmitCheckout={handleCheckoutSubmit}
+                onBackToCart={() => setActiveView('cart')}
+              />
+            )}
+
+            {activeView === 'login-user' && (
+              <UserAuthView 
+                tab={userAuthTab}
+                setTab={setUserAuthTab}
+                loginForm={userLoginForm}
+                setLoginForm={setUserLoginForm}
+                registerForm={userRegisterForm}
+                setRegisterForm={setUserRegisterForm}
+                customers={customers}
+                setCustomers={setCustomers}
+                setUserLoggedIn={setUserLoggedIn}
+                setActiveView={setActiveView}
+                showToast={showToast}
+              />
+            )}
+
+            {activeView === 'login-owner' && (
+              <OwnerLoginView 
+                onLoginSuccess={async () => {
+                  setOwnerLoggedIn(true);
+                  setActiveView('owner-dashboard');
+                  await loadOwnerOrders();
+                  await loadCloudProducts();
+                  showToast('Selamat Datang Owner!');
+                }}
+              />
+            )}
+
+            {activeView === 'owner-dashboard' && (
+              ownerLoggedIn ? (
+                <OwnerDashboardView 
+                  adminTab={adminTab}
+                  setAdminTab={setAdminTab}
+                  products={products}
+                  setProducts={persistProducts}
+                  categories={categories}
+                  setCategories={setCategories}
+                  banners={banners}
+                  setBanners={setBanners}
+                  orders={orders}
+                  setOrders={setOrders}
+                  customers={customers}
+                  setCustomers={setCustomers}
+                  emailNotifications={emailNotifications}
+                  storeSettings={storeSettings}
+                  setStoreSettings={setStoreSettings}
+                  showToast={showToast}
+                  onLogout={async () => {
+                    await supabaseClient.auth.signOut();
+                    setOwnerLoggedIn(false);
+                    setActiveView('home');
+                    showToast('Keluar');
+                  }}
+                />
+              ) : (
+                <div className="max-w-xs mx-auto px-3 py-12 text-center space-y-2">
+                  <div className="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center mx-auto">
+                    <Icon name="alert-circle" className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-xs font-black text-slate-900">Akses Ditolak</h2>
+                  <p className="text-[10px] text-slate-500">Halaman ini khusus untuk Owner.</p>
+                  <button 
+                    onClick={() => setActiveView('home')}
+                    className="px-3 py-1.5 bg-slate-900 text-white text-[9px] font-bold rounded-md shadow-2xs"
+                  >
+                    Kembali
+                  </button>
+                </div>
+              )
+            )}
+          </div>
+
+          {selectedProduct && (
+            <ProductDetailModal 
+              product={selectedProduct}
+              onClose={() => setSelectedProduct(null)}
+              onAddToCart={handleAddToCart}
+            />
+          )}
+
+          {infoModalTab && (
+            <InfoModal tab={infoModalTab} onClose={() => setInfoModalTab(null)} storeSettings={storeSettings} />
+          )}
+
+          <footer className="bg-slate-900 text-slate-300 border-t border-slate-800 text-[10px] py-5 px-3 mt-6">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <h3 className="text-white font-black text-[11px] mb-1 flex items-center gap-1">
+                  <span className="w-4 h-4 bg-amber-600 rounded text-white text-[9px] flex items-center justify-center font-bold">S</span>
+                  {storeSettings.name}
+                </h3>
+                <p className="text-slate-400 text-[9px] leading-relaxed">
+                  {storeSettings.footerDescription || 'Penyedia busana Muslim & E-Commerce fashion terkemuka.'}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="text-white font-bold mb-1 text-[9px] uppercase tracking-wider">Layanan</h4>
+                <ul className="space-y-0.5 text-[9px] text-slate-400">
+                  <li onClick={() => setInfoModalTab('cara-beli')} className="hover:text-amber-400 cursor-pointer">• Cara Pembelian & Checkout</li>
+                  <li onClick={() => setInfoModalTab('garansi-retur')} className="hover:text-amber-400 cursor-pointer">• Informasi Garansi Retur</li>
+                  <li onClick={() => setInfoModalTab('syarat-ketentuan')} className="hover:text-amber-400 cursor-pointer">• Syarat & Ketentuan</li>
+                  <li onClick={() => setInfoModalTab('kontak-cs')} className="hover:text-amber-400 cursor-pointer">• Kontak Customer Service</li>
+                  <li onClick={() => setInfoModalTab('kebijakan-privasi')} className="hover:text-amber-400 cursor-pointer">• Kebijakan Privasi</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-white font-bold mb-1 text-[9px] uppercase tracking-wider">Pembayaran</h4>
+                <p className="text-slate-400 text-[9px] mb-1">Transfer Bank & WhatsApp Instant.</p>
+                <div className="flex gap-1">
+                  <span className="bg-slate-800 text-slate-300 text-[7px] font-bold px-1 py-0.5 rounded">BCA</span>
+                  <span className="bg-slate-800 text-slate-300 text-[7px] font-bold px-1 py-0.5 rounded">MANDIRI</span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-white font-bold mb-1 text-[9px] uppercase tracking-wider">Kontak</h4>
+                <p className="text-slate-400 text-[9px]">WA: +{storeSettings.waNumber}</p>
+                <p className="text-slate-400 text-[9px] mt-1 whitespace-pre-line">{storeSettings.address}</p>
+              </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto border-t border-slate-800 mt-3 pt-2 text-center text-[8px] text-slate-500">
+              © {new Date().getFullYear()} {storeSettings.name} Official. All rights reserved.
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    // --- HOME VIEW ---
+    function HomeView({ banners, categories, selectedCategory, setSelectedCategory, products, onSelectProduct, onAddToCart, storeSettings }) {
+      return (
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-4 py-2.5 space-y-3">
+          {banners.length > 0 && (
+            <div className="relative rounded-lg overflow-hidden bg-slate-900 shadow-2xs min-h-[100px] sm:min-h-[150px] flex items-center">
+              <img src={banners[0].image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-40" />
+              <div className="relative z-10 p-3 sm:p-5 max-w-md space-y-1">
+                <span className="bg-amber-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-wide">
+                  PROMO
+                </span>
+                <h1 className="text-xs sm:text-lg font-black text-white leading-tight">
+                  {storeSettings.heroTitle || banners[0].title}
+                </h1>
+                <p className="text-slate-200 text-[9px] sm:text-[11px] line-clamp-1">
+                  {storeSettings.heroSubtitle || banners[0].subtitle}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <div className="flex gap-1 overflow-x-auto scrollbar-none pb-0.5">
+              {categories.map((cat, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-2.5 py-1 rounded-md text-[9px] sm:text-[10px] font-bold whitespace-nowrap transition ${selectedCategory === cat ? 'bg-amber-600 text-white shadow-2xs' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <h2 className="text-[11px] sm:text-xs font-black text-slate-900">Katalog Produk</h2>
+              <span className="text-[9px] text-slate-400">{products.length} item</span>
+            </div>
+
+            {products.length === 0 ? (
+              <div className="bg-white p-5 text-center rounded-lg border border-slate-200">
+                <p className="text-[10px] text-slate-500">Tidak ada produk ditemukan.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                {products.map((p) => (
+                  <div 
+                    key={p.id} 
+                    className="bg-white rounded-lg border border-slate-100 overflow-hidden shadow-2xs hover:shadow-md transition flex flex-col group cursor-pointer"
+                  >
+                    <div className="relative aspect-square bg-slate-100 overflow-hidden" onClick={() => onSelectProduct(p)}>
+                      <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                      {p.discountPrice && (
+                        <span className="absolute top-1 left-1 bg-red-600 text-white text-[7px] font-black px-1 py-0.5 rounded">
+                          {Math.round(((p.price - p.discountPrice) / p.price) * 100)}%
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-2 flex-1 flex flex-col justify-between space-y-1">
+                      <div onClick={() => onSelectProduct(p)}>
+                        <span className="text-[7px] font-bold text-slate-400 uppercase block">{p.category}</span>
+                        <h3 className="font-bold text-slate-900 text-[9px] sm:text-[10px] line-clamp-2 leading-tight group-hover:text-amber-600">{p.name}</h3>
+                      </div>
+
+                      <div className="space-y-1 pt-1 border-t border-slate-50">
+                        <div>
+                          {p.discountPrice ? (
+                            <div>
+                              <span className="text-[8px] text-slate-400 line-through">Rp {p.price.toLocaleString('id-ID')}</span>
+                              <span className="text-[10px] sm:text-[11px] font-black text-amber-600 block">Rp {p.discountPrice.toLocaleString('id-ID')}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] sm:text-[11px] font-black text-slate-900 block">Rp {p.price.toLocaleString('id-ID')}</span>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => onAddToCart(p)}
+                          className="w-full bg-slate-900 hover:bg-amber-600 text-white font-bold py-1 rounded text-[8px] sm:text-[9px] transition flex items-center justify-center gap-1"
+                        >
+                          <Icon name="shopping-cart" className="w-2.5 h-2.5" />
+                          <span>+ Keranjang</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- PRODUCT DETAIL MODAL ---
+    function ProductDetailModal({ product, onClose, onAddToCart }) {
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-2.5">
+          <div className="bg-white w-full max-w-lg rounded-xl shadow-xl overflow-hidden max-h-[85vh] flex flex-col sm:flex-row relative">
+            <button onClick={onClose} className="absolute top-2 right-2 z-10 p-1 bg-white/85 rounded-full text-slate-700 shadow-2xs">
+              <Icon name="x" className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="sm:w-1/2 aspect-square bg-slate-100">
+              <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+            </div>
+
+            <div className="sm:w-1/2 p-3.5 overflow-y-auto flex flex-col justify-between space-y-2.5 text-[10px]">
+              <div className="space-y-1.5">
+                <div>
+                  <span className="text-[8px] font-bold text-amber-600 uppercase">{product.category}</span>
+                  <h2 className="text-xs sm:text-sm font-black text-slate-900 leading-snug">{product.name}</h2>
+                </div>
+
+                <div>
+                  {product.discountPrice ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs sm:text-sm font-black text-amber-600">Rp {product.discountPrice.toLocaleString('id-ID')}</span>
+                      <span className="text-[9px] text-slate-400 line-through">Rp {product.price.toLocaleString('id-ID')}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs sm:text-sm font-black text-slate-900">Rp {product.price.toLocaleString('id-ID')}</span>
+                  )}
+                </div>
+
+                {product.variations && (
+                  <div className="bg-slate-50 p-2 rounded border border-slate-100">
+                    <span className="text-[8px] font-bold text-slate-500 block mb-0.5">Varian:</span>
+                    <p className="text-[9px] text-slate-800 font-semibold">{product.variations}</p>
+                  </div>
+                )}
+
+                <div className="space-y-0.5">
+                  <span className="text-[8px] font-bold text-slate-500 uppercase block">Deskripsi</span>
+                  <p className="text-[9px] text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t">
+                <button
+                  onClick={() => { onAddToCart(product); onClose(); }}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 rounded-lg text-[10px] shadow-2xs transition flex items-center justify-center gap-1"
+                >
+                  <Icon name="shopping-cart" className="w-3 h-3" />
+                  <span>Tambah ke Keranjang</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- INFO MODAL ---
+    function InfoModal({ tab, onClose, storeSettings }) {
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-2.5">
+          <div className="bg-white w-full max-w-sm rounded-lg shadow-xl overflow-hidden max-h-[80vh] flex flex-col text-[10px]">
+            <div className="p-2.5 border-b bg-slate-50 flex justify-between items-center">
+              <h3 className="font-black text-slate-900 text-[11px] flex items-center gap-1">
+                <Icon name="shield" className="w-3 h-3 text-amber-600" />
+                {tab === 'cara-beli' && 'Cara Pembelian & Checkout'}
+                {tab === 'garansi-retur' && 'Informasi Garansi & Retur'}
+                {tab === 'syarat-ketentuan' && 'Syarat & Ketentuan Toko'}
+                {tab === 'kontak-cs' && 'Kontak Customer Service'}
+                {tab === 'kebijakan-privasi' && 'Kebijakan Privasi'}
+              </h3>
+              <button onClick={onClose} className="p-0.5 text-slate-400 hover:text-slate-600">
+                <Icon name="x" className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 overflow-y-auto text-[10px] text-slate-600 space-y-2">
+              {tab === 'cara-beli' && <div className="whitespace-pre-line leading-relaxed">{storeSettings.contentCaraBeli}</div>}
+              {tab === 'garansi-retur' && <div className="whitespace-pre-line leading-relaxed">{storeSettings.contentGaransiRetur}</div>}
+              {tab === 'syarat-ketentuan' && <div className="whitespace-pre-line leading-relaxed">{storeSettings.contentSyaratKetentuan}</div>}
+              {tab === 'kontak-cs' && <div className="whitespace-pre-line leading-relaxed bg-amber-50 p-2 rounded border border-amber-200">{storeSettings.contentKontakCs}</div>}
+              {tab === 'kebijakan-privasi' && <div className="whitespace-pre-line leading-relaxed">{storeSettings.contentKebijakanPrivasi}</div>}
+            </div>
+
+            <div className="p-2 bg-slate-50 border-t flex justify-end">
+              <button onClick={onClose} className="px-3 py-1 bg-slate-800 text-white font-bold text-[9px] rounded">
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- CART VIEW ---
+    function CartView({ cart, onUpdateQty, onProceedToCheckout, onBackToShop }) {
+      const totalPrice = cart.reduce((sum, item) => sum + (item.discountPrice || item.price) * item.qty, 0);
+
+      return (
+        <div className="max-w-2xl mx-auto px-2.5 sm:px-4 py-3 space-y-2.5">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1">
+              <Icon name="shopping-cart" className="w-3.5 h-3.5 text-amber-600" /> Keranjang Belanja
+            </h2>
+            <button onClick={onBackToShop} className="text-[10px] font-bold text-amber-600 hover:underline">
+              + Belanja Lagi
+            </button>
+          </div>
+
+          {cart.length === 0 ? (
+            <div className="bg-white p-6 text-center rounded-lg border border-dashed border-slate-200 space-y-1.5">
+              <Icon name="shopping-cart" className="w-8 h-8 text-slate-300 mx-auto" />
+              <h3 className="text-[11px] font-bold text-slate-700">Keranjang Kosong</h3>
+              <button onClick={onBackToShop} className="px-3 py-1 bg-amber-600 text-white font-bold text-[9px] rounded shadow-2xs">
+                Mulai Belanja
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg border border-slate-100 shadow-2xs overflow-hidden divide-y text-[10px]">
+              {cart.map((item, index) => (
+                <div key={index} className="p-2.5 flex items-center gap-2.5">
+                  <img src={item.image} alt={item.name} className="w-10 h-10 object-cover rounded border" />
+                  <div className="flex-1">
+                    <h4 className="font-bold text-slate-900 text-[10px] line-clamp-1">{item.name}</h4>
+                    {item.variation && <p className="text-[8px] text-slate-400">{item.variation}</p>}
+                    <p className="text-amber-600 font-bold text-[10px]">Rp {(item.discountPrice || item.price).toLocaleString('id-ID')}</p>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded">
+                    <button onClick={() => onUpdateQty(item.id, item.variation, -1)} className="w-4 h-4 bg-white rounded font-bold text-[9px] flex items-center justify-center">-</button>
+                    <span className="text-[9px] font-bold w-3 text-center">{item.qty}</span>
+                    <button onClick={() => onUpdateQty(item.id, item.variation, 1)} className="w-4 h-4 bg-white rounded font-bold text-[9px] flex items-center justify-center">+</button>
+                  </div>
+                </div>
+              ))}
+
+              <div className="p-2.5 bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-2">
+                <div>
+                  <span className="text-[8px] uppercase font-bold text-slate-400 block">Total</span>
+                  <span className="text-xs font-black text-slate-900">Rp {totalPrice.toLocaleString('id-ID')}</span>
+                </div>
+                <button onClick={onProceedToCheckout} className="w-full sm:w-auto px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shadow-2xs">
+                  Checkout Sekarang
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- CHECKOUT VIEW ---
+    function CheckoutView({ cart, userLoggedIn, onSubmitCheckout, onBackToCart }) {
+      const [form, setForm] = useState({
+        name: userLoggedIn?.name || '',
+        phone: userLoggedIn?.phone || '',
+        address: '',
+        city: 'Jakarta',
+        postalCode: '12340',
+        paymentMethod: 'Transfer BCA',
+        notes: ''
+      });
+
+      const totalPrice = cart.reduce((sum, item) => sum + (item.discountPrice || item.price) * item.qty, 0);
+
+      return (
+        <div className="max-w-2xl mx-auto px-2.5 sm:px-4 py-3 space-y-2.5 text-[10px]">
+          <button onClick={onBackToCart} className="text-[10px] font-bold text-amber-600 hover:underline">
+            ← Kembali
+          </button>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <form onSubmit={(e) => onSubmitCheckout(e, form)} className="bg-white p-3 rounded-lg border border-slate-100 shadow-2xs space-y-2">
+              <h3 className="font-black text-slate-900 border-b pb-1 text-[11px]">Data Pengiriman</h3>
+
+              <div>
+                <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Nama Lengkap *</label>
+                <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+              </div>
+
+              <div>
+                <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Nomor WhatsApp *</label>
+                <input type="tel" required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+              </div>
+
+              <div>
+                <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Alamat Lengkap *</label>
+                <textarea rows={2} required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Kota *</label>
+                  <input type="text" required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Kode Pos</label>
+                  <input type="text" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Pembayaran</label>
+                <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500 bg-white">
+                  <option value="Transfer BCA">Transfer BCA</option>
+                  <option value="Transfer Mandiri">Transfer Mandiri</option>
+                  <option value="Bayar di WhatsApp">Konfirmasi via WA</option>
+                </select>
+              </div>
+
+              <button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded-lg text-[10px] shadow-2xs transition flex items-center justify-center gap-1 mt-1">
+                <Icon name="smartphone" className="w-3 h-3" />
+                <span>Buat Pesanan & Pesan via WhatsApp</span>
+              </button>
+            </form>
+
+            <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-2xs space-y-2 h-fit">
+              <h3 className="font-black text-slate-900 border-b pb-1 text-[11px]">Ringkasan</h3>
+              <div className="divide-y max-h-40 overflow-y-auto">
+                {cart.map((item, i) => (
+                  <div key={i} className="py-1 flex justify-between text-[10px]">
+                    <span className="line-clamp-1">{item.name} x{item.qty}</span>
+                    <span className="font-bold">Rp {((item.discountPrice || item.price) * item.qty).toLocaleString('id-ID')}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t pt-1.5 flex justify-between font-black text-xs">
+                <span>Total:</span>
+                <span className="text-amber-600">Rp {totalPrice.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- USER AUTH VIEW ---
+    function UserAuthView({ tab, setTab, loginForm, setLoginForm, registerForm, setRegisterForm, customers, setCustomers, setUserLoggedIn, setActiveView, showToast }) {
+      const handleLogin = (e) => {
+        e.preventDefault();
+        const found = customers.find(c => c.email.toLowerCase() === loginForm.email.toLowerCase());
+        if (found) {
+          setUserLoggedIn(found);
+          showToast(`Selamat datang, ${found.name}!`);
+          setActiveView('home');
+        } else {
+          alert('Email belum terdaftar.');
+        }
+      };
+
+      const handleRegister = (e) => {
+        e.preventDefault();
+        const existing = customers.find(c => c.email.toLowerCase() === registerForm.email.toLowerCase());
+        if (existing) {
+          alert('Email sudah terdaftar!');
+          return;
+        }
+
+        const newCust = {
+          id: 'cust-' + Date.now(),
+          name: registerForm.name,
+          email: registerForm.email,
+          phone: registerForm.phone,
+          status: 'Pending',
+          registeredAt: new Date().toISOString()
+        };
+
+        setCustomers(prev => [newCust, ...prev]);
+        setUserLoggedIn(newCust);
+        showToast('Pendaftaran berhasil!');
+        setActiveView('home');
+      };
+
+      const handleGoogleSignIn = () => {
+        const newGoogleCust = {
+          id: 'cust-google-' + Date.now(),
+          name: 'Google User',
+          email: 'user.google@gmail.com',
+          phone: '08123456789',
+          status: 'Approved',
+          registeredAt: new Date().toISOString()
+        };
+        setCustomers(prev => [newGoogleCust, ...prev]);
+        setUserLoggedIn(newGoogleCust);
+        showToast('Berhasil masuk dengan Google!');
+        setActiveView('home');
+      };
+
+      return (
+        <div className="max-w-xs mx-auto px-2.5 py-6">
+          <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-md space-y-2.5 text-[10px]">
+            <div className="flex bg-slate-100 p-0.5 rounded">
+              <button onClick={() => setTab('login')} className={`flex-1 py-1 font-bold rounded transition ${tab === 'login' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500'}`}>Masuk</button>
+              <button onClick={() => setTab('register')} className={`flex-1 py-1 font-bold rounded transition ${tab === 'register' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500'}`}>Daftar</button>
+            </div>
+
+            <button onClick={handleGoogleSignIn} type="button" className="w-full bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-1.5 rounded-lg text-[10px] shadow-2xs flex items-center justify-center gap-1.5">
+              <svg className="w-3 h-3" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+              <span>Google Sign-In</span>
+            </button>
+
+            {tab === 'login' ? (
+              <form onSubmit={handleLogin} className="space-y-2">
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Email</label>
+                  <input type="email" required value={loginForm.email} onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Password</label>
+                  <input type="password" required value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 rounded-lg text-[10px] shadow-2xs">Masuk</button>
+              </form>
+            ) : (
+              <form onSubmit={handleRegister} className="space-y-2">
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Nama Lengkap</label>
+                  <input type="text" required value={registerForm.name} onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Email</label>
+                  <input type="email" required value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-700 mb-0.5">WhatsApp</label>
+                  <input type="tel" required value={registerForm.phone} onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Password</label>
+                  <input type="password" required value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+                </div>
+                <button type="submit" className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 rounded-lg text-[10px] shadow-2xs">Daftar</button>
+              </form>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // --- OWNER LOGIN VIEW ---
+    function OwnerLoginView({ onLoginSuccess }) {
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [errorMsg, setErrorMsg] = useState('');
+
+      const handleOwnerLogin = async (e) => {
+        e.preventDefault();
+        setErrorMsg('');
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) { setErrorMsg('Login gagal. Periksa email dan password.'); return; }
+        const { data: allowed, error: ownerError } = await supabaseClient.rpc('is_owner');
+        if (ownerError || !allowed) {
+          await supabaseClient.auth.signOut();
+          setErrorMsg('Akun ini tidak terdaftar sebagai owner SAWWAL.');
+          return;
+        }
+        await onLoginSuccess();
+      };
+
+      return (
+        <div className="max-w-xs mx-auto px-2.5 py-8">
+          <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-md space-y-2.5 text-[10px]">
+            <div className="text-center space-y-1">
+              <div className="w-8 h-8 bg-slate-900 text-amber-400 rounded-lg flex items-center justify-center mx-auto">
+                <Icon name="shield" className="w-4 h-4" />
+              </div>
+              <h2 className="font-black text-slate-900 text-xs">Owner Login</h2>
+            </div>
+
+            {errorMsg && <div className="bg-red-50 text-red-600 p-1.5 rounded text-[9px] font-bold">{errorMsg}</div>}
+
+            <form onSubmit={handleOwnerLogin} className="space-y-2">
+              <div>
+                <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Email</label>
+                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+              </div>
+              <div>
+                <label className="block text-[8px] font-bold text-slate-700 mb-0.5">Password</label>
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border p-1 rounded text-[10px] outline-none focus:ring-1 focus:ring-amber-500" />
+              </div>
+              <button type="submit" className="w-full bg-slate-900 text-amber-400 font-bold py-1.5 rounded-lg text-[10px] shadow-2xs">Masuk Panel</button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // --- OWNER DASHBOARD VIEW ---
+    function OwnerDashboardView({ 
+      adminTab, setAdminTab, products, setProducts, categories, setCategories, 
+      banners, setBanners, orders, setOrders, customers, setCustomers, 
+      emailNotifications, storeSettings, setStoreSettings, showToast, onLogout 
+    }) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex flex-col md:flex-row text-[10px]">
+          <aside className="w-full md:w-44 bg-slate-900 text-slate-300 p-1.5 flex flex-row md:flex-col justify-between border-r border-slate-800 overflow-x-auto">
+            <div className="flex flex-row md:flex-col gap-1 w-full">
+              <div className="hidden md:block p-1.5 border-b border-slate-800 mb-1">
+                <span className="font-black text-white text-[10px] block">PANEL OWNER</span>
+              </div>
+              <button onClick={() => setAdminTab('dashboard')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'dashboard' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="layout-dashboard" className="w-2.5 h-2.5" /> Ringkasan
+              </button>
+              <button onClick={() => setAdminTab('add-product')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'add-product' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="plus" className="w-2.5 h-2.5" /> Tambah Produk
+              </button>
+              <button onClick={() => setAdminTab('products')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'products' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="package" className="w-2.5 h-2.5" /> Kelola Produk
+              </button>
+              <button onClick={() => setAdminTab('categories')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'categories' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="tag" className="w-2.5 h-2.5" /> Kategori
+              </button>
+              <button onClick={() => setAdminTab('customers')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'customers' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="user-check" className="w-2.5 h-2.5" /> Pelanggan
+              </button>
+              <button onClick={() => setAdminTab('orders')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'orders' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="shopping-bag" className="w-2.5 h-2.5" /> Pesanan
+              </button>
+              <button onClick={() => setAdminTab('notifications')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'notifications' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="mail" className="w-2.5 h-2.5" /> Log Email
+              </button>
+              <button onClick={() => setAdminTab('banners')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'banners' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="image" className="w-2.5 h-2.5" /> Banner
+              </button>
+              <button onClick={() => setAdminTab('settings')} className={`p-1 rounded font-bold flex items-center gap-1 whitespace-nowrap ${adminTab === 'settings' ? 'bg-amber-600 text-white' : 'hover:bg-slate-800'}`}>
+                <Icon name="settings" className="w-2.5 h-2.5" /> Pengaturan
+              </button>
+            </div>
+            <button onClick={onLogout} className="p-1 text-red-400 hover:bg-slate-800 rounded font-bold flex items-center gap-1 mt-1">
+              <Icon name="log-out" className="w-2.5 h-2.5" /> Keluar
+            </button>
+          </aside>
+
+          <main className="flex-1 p-2.5 sm:p-4 overflow-y-auto">
+            {adminTab === 'dashboard' && <AdminStatsPanel products={products} orders={orders} customers={customers} />}
+            {adminTab === 'add-product' && <AdminAddProductPanel setProducts={setProducts} categories={categories} showToast={showToast} onDone={() => setAdminTab('products')} />}
+            {adminTab === 'customers' && <AdminCustomersPanel customers={customers} setCustomers={setCustomers} showToast={showToast} />}
+            {adminTab === 'products' && <AdminProductsPanel products={products} setProducts={setProducts} categories={categories} showToast={showToast} />}
+            {adminTab === 'categories' && <AdminCategoriesPanel categories={categories} setCategories={setCategories} showToast={showToast} />}
+            {adminTab === 'orders' && <AdminOrdersPanel orders={orders} setOrders={setOrders} showToast={showToast} />}
+            {adminTab === 'notifications' && <AdminNotificationsPanel notifications={emailNotifications} ownerEmail={storeSettings.ownerEmail} />}
+            {adminTab === 'banners' && <AdminBannersPanel banners={banners} setBanners={setBanners} showToast={showToast} />}
+            {adminTab === 'settings' && <AdminSettingsPanel storeSettings={storeSettings} setStoreSettings={setStoreSettings} showToast={showToast} />}
+          </main>
+        </div>
+      );
+    }
+
+    function AdminStatsPanel({ products, orders, customers }) {
+      const totalOmset = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+      return (
+        <div className="space-y-2.5">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Ringkasan Statistik</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-2xs">
+              <span className="text-[8px] font-bold text-slate-400 uppercase">Omset</span>
+              <h3 className="text-[11px] sm:text-xs font-black text-amber-600 mt-0.5">Rp {totalOmset.toLocaleString('id-ID')}</h3>
+            </div>
+            <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-2xs">
+              <span className="text-[8px] font-bold text-slate-400 uppercase">Pesanan</span>
+              <h3 className="text-[11px] sm:text-xs font-black text-slate-900 mt-0.5">{orders.length}</h3>
+            </div>
+            <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-2xs">
+              <span className="text-[8px] font-bold text-slate-400 uppercase">Produk</span>
+              <h3 className="text-[11px] sm:text-xs font-black text-slate-900 mt-0.5">{products.length}</h3>
+            </div>
+            <div className="bg-white p-2.5 rounded-lg border border-slate-100 shadow-2xs">
+              <span className="text-[8px] font-bold text-slate-400 uppercase">Pelanggan</span>
+              <h3 className="text-[11px] sm:text-xs font-black text-slate-900 mt-0.5">{customers.length}</h3>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function AdminCustomersPanel({ customers, setCustomers, showToast }) {
+      return (
+        <div className="space-y-2.5">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Persetujuan Pelanggan</h2>
+          <div className="bg-white rounded-lg border border-slate-100 overflow-x-auto">
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-slate-50 border-b font-bold text-[8px] uppercase">
+                <tr>
+                  <th className="p-2">Nama</th>
+                  <th className="p-2">WhatsApp</th>
+                  <th className="p-2">Status</th>
+                  <th className="p-2 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {customers.map((c) => (
+                  <tr key={c.id}>
+                    <td className="p-2 font-bold">{c.name}</td>
+                    <td className="p-2">{c.phone}</td>
+                    <td className="p-2">
+                      <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${c.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{c.status}</span>
+                    </td>
+                    <td className="p-2 text-right space-x-1">
+                      {c.status === 'Pending' && <button onClick={() => { setCustomers(prev => prev.map(item => item.id === c.id ? {...item, status: 'Approved'} : item)); showToast('Disetujui'); }} className="px-1.5 py-0.5 bg-emerald-600 text-white rounded font-bold text-[8px]">Setuju</button>}
+                      <button onClick={() => { setCustomers(prev => prev.filter(item => item.id !== c.id)); showToast('Dihapus'); }} className="px-1.5 py-0.5 bg-red-50 text-red-600 rounded font-bold text-[8px]">Hapus</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function AdminNotificationsPanel({ notifications, ownerEmail }) {
+      return (
+        <div className="space-y-2.5">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Log Email ({ownerEmail})</h2>
+          {notifications.length === 0 ? (
+            <div className="bg-white p-5 text-center rounded-lg border text-[10px]">Riwayat email akan ditampilkan setelah modul log Supabase dihubungkan.</div>
+          ) : (
+            <div className="space-y-1.5">
+              {notifications.map((m) => (
+                <div key={m.id} className="bg-white p-2.5 rounded-lg border space-y-1 text-[10px]">
+                  <div className="font-black text-amber-600">{m.subject}</div>
+                  <pre className="text-slate-600 font-mono text-[9px] bg-slate-50 p-1.5 rounded">{m.body}</pre>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function AdminCategoriesPanel({ categories, setCategories, showToast }) {
+      const [newCat, setNewCat] = useState('');
+      return (
+        <div className="space-y-2.5 max-w-md">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Kelola Kategori</h2>
+          <form onSubmit={(e) => { e.preventDefault(); if(newCat) { setCategories([...categories, newCat]); setNewCat(''); showToast('Kategori ditambahkan'); }}} className="flex gap-1.5">
+            <input type="text" placeholder="Kategori baru..." value={newCat} onChange={(e) => setNewCat(e.target.value)} className="flex-1 border p-1 rounded text-[10px]" />
+            <button type="submit" className="bg-amber-600 text-white px-2.5 py-1 rounded font-bold text-[10px]">Tambah</button>
+          </form>
+          <div className="bg-white rounded-lg border divide-y text-[10px]">
+            {categories.map((c, i) => (
+              <div key={i} className="p-2 flex justify-between items-center">
+                <span className="font-bold">{c}</span>
+                <button onClick={() => { setCategories(categories.filter(item => item !== c)); showToast('Kategori dihapus'); }} className="text-red-500 font-bold text-[9px]">Hapus</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function AdminAddProductPanel({ setProducts, categories, showToast, onDone }) {
+      const [form, setForm] = useState({ name: '', price: '', discountPrice: '', stock: '25', category: categories[0], description: '', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=600' });
+
+      const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setForm(prev => ({ ...prev, image: reader.result }));
+            showToast('Foto produk berhasil diunggah!');
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      return (
+        <div className="space-y-2.5 max-w-xl">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Tambah Produk Baru</h2>
+          <form onSubmit={(e) => { e.preventDefault(); setProducts(prev => [{id: 'prod-'+Date.now(), ...form, price: Number(form.price), discountPrice: form.discountPrice ? Number(form.discountPrice) : null}, ...prev]); showToast('Produk ditambahkan!'); onDone(); }} className="bg-white p-3 rounded-lg border space-y-2 text-[10px]">
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Nama Produk</label>
+              <input type="text" required value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <div>
+                <label className="block text-[8px] font-bold mb-0.5">Harga Normal (Rp)</label>
+                <input type="number" required value={form.price} onChange={(e) => setForm({...form, price: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+              </div>
+              <div>
+                <label className="block text-[8px] font-bold mb-0.5">Harga Diskon (Opsional)</label>
+                <input type="number" value={form.discountPrice} onChange={(e) => setForm({...form, discountPrice: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <div>
+                <label className="block text-[8px] font-bold mb-0.5">Stok</label>
+                <input type="number" required value={form.stock} onChange={(e) => setForm({...form, stock: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+              </div>
+              <div>
+                <label className="block text-[8px] font-bold mb-0.5">Kategori</label>
+                <select value={form.category} onChange={(e) => setForm({...form, category: e.target.value})} className="w-full border p-1 rounded text-[10px] bg-white">
+                  {categories.map((c, i) => <option key={i} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Foto Produk (Unggah File atau URL)</label>
+              <div className="space-y-1">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                  className="w-full text-[9px] text-slate-500 cursor-pointer file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-bold file:bg-amber-100 file:text-amber-800" 
+                />
+                <input 
+                  type="url" 
+                  placeholder="Atau masukkan URL Gambar..." 
+                  required 
+                  value={form.image} 
+                  onChange={(e) => setForm({...form, image: e.target.value})} 
+                  className="w-full border p-1 rounded text-[10px]" 
+                />
+              </div>
+              {form.image && <img src={form.image} alt="Preview" className="w-12 h-12 object-cover rounded mt-1 border" />}
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Deskripsi Produk</label>
+              <textarea rows={2} value={form.description} onChange={(e) => setForm({...form, description: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <button type="submit" className="w-full bg-amber-600 text-white font-bold py-1.5 rounded-lg text-[10px]">Simpan Produk</button>
+          </form>
+        </div>
+      );
+    }
+
+    function AdminProductsPanel({ products, setProducts, categories, showToast }) {
+      return (
+        <div className="space-y-2.5">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Kelola Produk</h2>
+          <div className="bg-white rounded-lg border overflow-x-auto">
+            <table className="w-full text-left text-[10px]">
+              <thead className="bg-slate-50 border-b font-bold text-[8px] uppercase">
+                <tr>
+                  <th className="p-2">Produk</th>
+                  <th className="p-2">Harga</th>
+                  <th className="p-2 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {products.map((p) => (
+                  <tr key={p.id}>
+                    <td className="p-2 flex items-center gap-1.5">
+                      <img src={p.image} className="w-7 h-7 object-cover rounded" />
+                      <span className="font-bold line-clamp-1">{p.name}</span>
+                    </td>
+                    <td className="p-2 font-bold text-amber-600">Rp {(p.discountPrice || p.price).toLocaleString('id-ID')}</td>
+                    <td className="p-2 text-right">
+                      <button onClick={() => { setProducts(prev => prev.filter(item => item.id !== p.id)); showToast('Dihapus'); }} className="text-red-500 font-bold text-[9px]">Hapus</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function AdminOrdersPanel({ orders, setOrders, showToast }) {
+      return (
+        <div className="space-y-2.5">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Pesanan Masuk</h2>
+          {orders.length === 0 ? <div className="bg-white p-5 text-center rounded-lg border text-[10px]">Belum ada pesanan.</div> : (
+            <div className="space-y-1.5">
+              {orders.map((o) => (
+                <div key={o.id} className="bg-white p-2.5 rounded-lg border space-y-1 text-[10px]">
+                  <div className="flex justify-between font-black">
+                    <span>{o.id}</span>
+                    <span className="text-amber-600">Rp {o.total.toLocaleString('id-ID')}</span>
+                  </div>
+                  <p className="text-slate-500 text-[9px]">{o.customerName} ({o.customerPhone})</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function AdminBannersPanel({ banners, setBanners, showToast }) {
+      const [title, setTitle] = useState('');
+      const [subtitle, setSubtitle] = useState('');
+      const [image, setImage] = useState('');
+
+      const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setImage(reader.result);
+            showToast('Foto banner berhasil diunggah!');
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      const handleAddBanner = (e) => {
+        e.preventDefault();
+        if (!title || !image) return;
+        setBanners(prev => [{ id: 'b-' + Date.now(), title, subtitle, image }, ...prev]);
+        setTitle('');
+        setSubtitle('');
+        setImage('');
+        showToast('Banner promo ditambahkan!');
+      };
+
+      return (
+        <div className="space-y-2.5 max-w-lg">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Kelola Banner Promo</h2>
+
+          <form onSubmit={handleAddBanner} className="bg-white p-3 rounded-lg border space-y-2 text-[10px]">
+            <h3 className="font-bold text-slate-800 text-[10px]">Tambah Banner Promo Baru</h3>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Judul Banner</label>
+              <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Subjudul Promo</label>
+              <input type="text" value={subtitle} onChange={(e) => setSubtitle(e.target.value)} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Foto Banner (Unggah File atau URL)</label>
+              <div className="space-y-1">
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageUpload} 
+                  className="w-full text-[9px] text-slate-500 cursor-pointer file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-bold file:bg-amber-100 file:text-amber-800" 
+                />
+                <input 
+                  type="url" 
+                  placeholder="Atau masukkan URL Gambar..." 
+                  required 
+                  value={image} 
+                  onChange={(e) => setImage(e.target.value)} 
+                  className="w-full border p-1 rounded text-[10px]" 
+                />
+              </div>
+              {image && <img src={image} alt="Preview" className="w-full h-16 object-cover rounded mt-1 border" />}
+            </div>
+            <button type="submit" className="w-full bg-amber-600 text-white font-bold py-1.5 rounded-lg text-[10px]">+ Simpan Banner</button>
+          </form>
+
+          <div className="bg-white rounded-lg border p-3 space-y-2 text-[10px]">
+            <h3 className="font-bold text-slate-800 text-[10px]">Daftar Banner</h3>
+            {banners.map((b) => (
+              <div key={b.id} className="p-1.5 border rounded flex items-center justify-between gap-2">
+                <img src={b.image} className="w-16 h-10 object-cover rounded" />
+                <div className="flex-1">
+                  <p className="font-bold leading-tight">{b.title}</p>
+                  <p className="text-[8px] text-slate-400">{b.subtitle}</p>
+                </div>
+                <button onClick={() => { setBanners(prev => prev.filter(item => item.id !== b.id)); showToast('Banner dihapus'); }} className="text-red-500 font-bold text-[9px]">Hapus</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    function AdminSettingsPanel({ storeSettings, setStoreSettings, showToast }) {
+      const [form, setForm] = useState(storeSettings);
+      return (
+        <div className="space-y-2.5 max-w-lg">
+          <h2 className="text-xs sm:text-sm font-black text-slate-900">Pengaturan Tampilan & Konten Toko</h2>
+          <form onSubmit={(e) => { e.preventDefault(); setStoreSettings(form); showToast('Pengaturan disimpan!'); }} className="bg-white p-3 rounded-lg border space-y-2 text-[10px]">
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Nama Toko</label>
+              <input type="text" value={form.name} onChange={(e) => setForm({...form, name: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Tagline Toko</label>
+              <input type="text" value={form.tagline || ''} onChange={(e) => setForm({...form, tagline: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Teks Pengumuman Atas (Announcement Bar)</label>
+              <input type="text" value={form.announcementText || ''} onChange={(e) => setForm({...form, announcementText: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Judul Utama Banner Hero (Promo)</label>
+              <input type="text" value={form.heroTitle || ''} onChange={(e) => setForm({...form, heroTitle: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Subjudul Banner Hero</label>
+              <input type="text" value={form.heroSubtitle || ''} onChange={(e) => setForm({...form, heroSubtitle: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Deskripsi Singkat Footer</label>
+              <textarea rows={2} value={form.footerDescription || ''} onChange={(e) => setForm({...form, footerDescription: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Nomor WhatsApp CS (Tanpa karakter +, Contoh: 6288235985430)</label>
+              <input type="text" value={form.waNumber} onChange={(e) => setForm({...form, waNumber: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Email Owner</label>
+              <input type="email" value={form.ownerEmail || ''} onChange={(e) => setForm({...form, ownerEmail: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+            <div>
+              <label className="block text-[8px] font-bold mb-0.5">Alamat Fisik Toko</label>
+              <textarea rows={2} value={form.address || ''} onChange={(e) => setForm({...form, address: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+            </div>
+
+            <div className="pt-1 border-t">
+              <h3 className="font-bold text-slate-800 text-[9px] mb-1">Pengaturan Isi Halaman Layanan Pelanggan & Informasi Kontak</h3>
+              <div className="space-y-1.5">
+                <div>
+                  <label className="block text-[8px] font-bold mb-0.5">Isi Halaman Cara Pembelian & Checkout</label>
+                  <textarea rows={2} value={form.contentCaraBeli} onChange={(e) => setForm({...form, contentCaraBeli: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold mb-0.5">Isi Halaman Informasi Garansi Retur</label>
+                  <textarea rows={2} value={form.contentGaransiRetur} onChange={(e) => setForm({...form, contentGaransiRetur: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold mb-0.5">Isi Halaman Syarat & Ketentuan</label>
+                  <textarea rows={2} value={form.contentSyaratKetentuan} onChange={(e) => setForm({...form, contentSyaratKetentuan: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+                </div>
+                <div>
+                  <label className="block text-[8px] font-bold mb-0.5">Isi Halaman Kontak CS</label>
+                  <textarea rows={2} value={form.contentKontakCs} onChange={(e) => setForm({...form, contentKontakCs: e.target.value})} className="w-full border p-1 rounded text-[10px]" />
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" className="w-full bg-amber-600 text-white font-bold py-1.5 rounded-lg text-[10px]">Simpan Pengaturan Tampilan & Konten</button>
+          </form>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
